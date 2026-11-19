@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Full-Body Lift Log</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#2f5fd0">
+<meta name="theme-color" id="themeColor" content="#121419">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,7 +37,8 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4;-webkit-text-size-adjust:100%}
-.wrap{max-width:560px;margin:0 auto;padding:0 16px 210px}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px calc(var(--dock-h,0px) + 20px)}
+header .wrap{padding-bottom:0}
 header{padding:12px 0 0}
 h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.02em;margin:0 0 8px;text-transform:uppercase}
 nav{display:flex;gap:6px;overflow-x:auto}
@@ -392,9 +393,18 @@ async function holdScreen(on){
 }
 function startTimer(sec,next,from){ timer={endAt:Date.now()+sec*1000,total:sec,next,from,done:false}; saveTimer(); holdScreen(true); renderTimer(); }
 function stopTimer(){ timer=null; saveTimer(); holdScreen(false); document.body.classList.remove("rest-over"); renderTimer(); }
+function buzz(){ try{ return !!(navigator.vibrate && navigator.vibrate([400,150,400,150,400])); }catch(e){ return false; } }
+async function notifyRestOver(next){
+  try{
+    if(!("Notification" in window) || Notification.permission!=="granted") return;
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(reg) reg.showNotification("Rest over",{body:next?"Go: "+next:"Next set",tag:"rest",renotify:true,vibrate:[400,150,400,150,400],icon:"icon-192.png",badge:"icon-192.png"});
+  }catch(e){}
+}
 function fireDone(){
   timer.done=true; saveTimer();
-  try{ if(navigator.vibrate) navigator.vibrate([400,150,400,150,400]); }catch(e){}
+  buzz();
+  if(document.hidden) notifyRestOver(timer.next);
   document.body.classList.add("rest-over");
   renderTimer();
 }
@@ -484,7 +494,17 @@ function settingsHtml(){
     <p class="note">Total max: ${fmt(total)} kg. Pull-up loads are calculated on the total (bodyweight + added), then rounded down to the kilo.</p>
   </div>
   <h2>Pull-up loads</h2>
-  <div class="card" style="overflow-x:auto"><table><thead><tr><th>Day</th><th>Sets</th><th>%</th><th>Total</th><th>Added</th></tr></thead><tbody>${rows}</tbody></table></div>`+backupHtml();
+  <div class="card" style="overflow-x:auto"><table><thead><tr><th>Day</th><th>Sets</th><th>%</th><th>Total</th><th>Added</th></tr></thead><tbody>${rows}</tbody></table></div>`+alertsHtml()+backupHtml();
+}
+function alertsHtml(){
+  const perm = ("Notification" in window) ? Notification.permission : "unsupported";
+  const permTxt = perm==="granted" ? "On" : perm==="denied" ? "Blocked (change it in the phone's settings for this app)" : perm==="unsupported" ? "Not available on this phone" : "Off";
+  return `<h2>Rest alerts</h2>
+  <div class="card">
+    <p class="note" style="font-size:15px;margin:0">When a rest ends, the phone vibrates while the app is open. Tap the test: if nothing happens, check that vibration is on in the phone's sound settings (silent or Do Not Disturb modes can block it).</p>
+    <div class="row-btns"><button class="ghost" id="testBuzz">Test vibration</button>${perm==="default"?`<button class="ghost" id="askNotif">Alert me when the app is in the background</button>`:""}</div>
+    <p class="note" style="margin:0">Background alerts: <strong>${esc(permTxt)}</strong>. The screen stays on while a rest timer runs, so the alert can fire.</p>
+  </div>`;
 }
 
 function render(){
@@ -602,6 +622,8 @@ $("#view").addEventListener("click",async e=>{
   if(rm){ draft[rm.dataset.rmset].pop(); storeDraft(+view.slice(1)); render(); return; }
   if(t.id==="finish"){ finishWorkout(); return; }
   if(t.id==="exportBtn"){ exportBackup(); return; }
+  if(t.id==="testBuzz"){ if(!buzz()) toast("This phone didn't accept the vibration. Check its vibration settings."); return; }
+  if(t.id==="askNotif"){ try{ Notification.requestPermission().then(()=>render()); }catch(e){} return; }
   if(t.id==="importBtn"){ $("#importFile").click(); return; }
   if(t.id==="installBtn" && installEvt){ installEvt.prompt(); installEvt.userChoice.finally(()=>{ installEvt=null; render(); }); return; }
   const del=t.closest("[data-del]");
@@ -778,7 +800,45 @@ window.addEventListener("appinstalled",()=>{ installEvt=null; if(view==="home") 
     const st=$("#status"); st.textContent="This browser won't let the app store data. Open it in Chrome (not a private tab)."; st.className="status warn"; render();
   }
 })();
-if("serviceWorker" in navigator){ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
+/* ---------- Layout & theme ---------- */
+(function(){
+  const dock=$("#dock");
+  const setH=()=>document.documentElement.style.setProperty("--dock-h",(dock.hidden?0:dock.offsetHeight)+"px");
+  try{ new ResizeObserver(setH).observe(dock); }catch(e){}
+  new MutationObserver(setH).observe(dock,{attributes:true,attributeFilter:["hidden"]});
+  setH();
+  const mq=matchMedia("(prefers-color-scheme: dark)");
+  const sync=()=>{ const bg=getComputedStyle(document.body).backgroundColor; $("#themeColor").setAttribute("content", bg || (mq.matches?"#121419":"#f3f4f6")); };
+  sync(); try{ mq.addEventListener("change",sync); }catch(e){}
+})();
+
+/* ---------- Updates ---------- */
+const APP_VERSION="2";
+async function checkForUpdate(){
+  if(!navigator.onLine) return;
+  try{
+    const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),5000);
+    const r=await fetch("version.json?t="+Date.now(),{cache:"no-store",signal:ctl.signal}); clearTimeout(to);
+    if(!r.ok) return;
+    const v=(await r.json()).version;
+    if(v && String(v)!==APP_VERSION){
+      let tried=null; try{ tried=sessionStorage.getItem("liftlog-update-tried"); }catch(e){}
+      if(tried===String(v)) return;
+      try{ sessionStorage.setItem("liftlog-update-tried",String(v)); }catch(e){}
+      await applyUpdate();
+    }
+  }catch(e){}
+}
+async function applyUpdate(){
+  try{
+    const reg=await navigator.serviceWorker.getRegistration(); if(reg) await reg.update();
+    const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k)));
+  }catch(e){}
+  toast("Updating to the latest version…");
+  setTimeout(()=>location.reload(),600);
+}
+if("serviceWorker" in navigator){ window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); checkForUpdate(); }); }
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && view==="home") checkForUpdate(); });
 
 </script>
 </body>
