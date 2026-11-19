@@ -112,6 +112,7 @@ th{font-weight:600;color:var(--muted);font-size:13px}
 .hchip{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px}
 .hchip.prog{background:var(--warn-soft);color:var(--warn)}
 .hchip.next{background:var(--accent-soft);color:var(--accent)}
+.app-version{position:fixed;left:16px;bottom:calc(10px + env(safe-area-inset-bottom));margin:0;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:6px}
 .page-head h2{margin:12px 0 2px}
 .page-head .note{margin:0}
@@ -155,6 +156,7 @@ body.rest-over .dock{animation:pulse 1.2s ease-in-out 4}
 <div id="toast" class="toast" hidden></div>
 
 <script>
+var APP_VERSION="4";
 /* ---------- Program ---------- */
 const PULL_DAYS = {
   1:{sets:4,reps:4,pct:0.85,label:"85%"},
@@ -391,20 +393,21 @@ async function holdScreen(on){
     if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; }
   }catch(e){ wakeLock=null; }
 }
-function startTimer(sec,next,from){ timer={endAt:Date.now()+sec*1000,total:sec,next,from,done:false}; saveTimer(); holdScreen(true); renderTimer(); }
-function stopTimer(){ timer=null; saveTimer(); holdScreen(false); document.body.classList.remove("rest-over"); renderTimer(); }
+function startTimer(sec,next,from){ clearRestNotification(); timer={endAt:Date.now()+sec*1000,total:sec,next,from,done:false}; saveTimer(); holdScreen(true); renderTimer(); }
+async function clearRestNotification(){ try{ const reg=await navigator.serviceWorker.getRegistration(); if(reg){ (await reg.getNotifications({tag:"rest"})).forEach(n=>n.close()); } }catch(e){} }
+function stopTimer(){ clearRestNotification(); timer=null; saveTimer(); holdScreen(false); document.body.classList.remove("rest-over"); renderTimer(); }
 function buzz(){ try{ return !!(navigator.vibrate && navigator.vibrate([400,150,400,150,400])); }catch(e){ return false; } }
 async function notifyRestOver(next){
   try{
     if(!("Notification" in window) || Notification.permission!=="granted") return;
     const reg=await navigator.serviceWorker.getRegistration();
-    if(reg) reg.showNotification("Rest over",{body:next?"Go: "+next:"Next set",tag:"rest",renotify:true,vibrate:[400,150,400,150,400],icon:"icon-192.png",badge:"icon-192.png"});
+    if(reg) await reg.showNotification("Rest over",{body:next?"Go: "+next:"Next set",tag:"rest",renotify:true,silent:false,vibrate:[400,150,400,150,400],icon:"icon-192.png",badge:"icon-192.png"});
   }catch(e){}
 }
 function fireDone(){
   timer.done=true; saveTimer();
   buzz();
-  if(document.hidden) notifyRestOver(timer.next);
+  notifyRestOver(timer.next);
   document.body.classList.add("rest-over");
   renderTimer();
 }
@@ -455,7 +458,8 @@ function homeHtml(){
       <button class="home-btn small" data-go="history"><span class="hb-main">History</span><span class="hb-sub">${lastTxt}</span></button>
       <button class="home-btn small" data-go="settings"><span class="hb-main">Max &amp; weight</span><span class="hb-sub">${fmt(profile.bw)} kg · max +${fmt(profile.max)} kg</span></button>
     </div>
-  </div>`;
+  </div>
+  <p class="app-version">Version ${APP_VERSION}</p>`;
 }
 function openLeaveConfirm(){
   const day=+view.slice(1), total=dayPages().length;
@@ -498,14 +502,16 @@ function settingsHtml(){
 }
 function alertsHtml(){
   const perm = ("Notification" in window) ? Notification.permission : "unsupported";
-  const permTxt = perm==="granted" ? "On" : perm==="denied" ? "Blocked (change it in the phone's settings for this app)" : perm==="unsupported" ? "Not available on this phone" : "Off";
+  const on = perm==="granted";
+  const permTxt = on ? "On" : perm==="denied" ? "Blocked: allow notifications in Settings → Apps → Lift Log" : perm==="unsupported" ? "Not available on this phone" : "Off";
   return `<h2>Rest alerts</h2>
   <div class="card">
-    <p class="note" style="font-size:15px;margin:0">When a rest ends, the phone vibrates while the app is open. Tap the test: if nothing happens, check that vibration is on in the phone's sound settings (silent or Do Not Disturb modes can block it).</p>
-    <div class="row-btns"><button class="ghost" id="testBuzz">Test vibration</button>${perm==="default"?`<button class="ghost" id="askNotif">Alert me when the app is in the background</button>`:""}</div>
-    <p class="note" style="margin:0">Background alerts: <strong>${esc(permTxt)}</strong>. The screen stays on while a rest timer runs, so the alert can fire.</p>
+    <p class="note" style="font-size:15px;margin:0">When a rest ends, the app shows a "Rest over" notification. Its vibration follows your notification settings, so haptic feedback can stay off. To make it silent but vibrating: Settings → Apps → Lift Log → Notifications → turn the sound off and keep vibration on.</p>
+    <p class="note" style="margin:0">Notifications: <strong>${esc(permTxt)}</strong></p>
+    <div class="row-btns">${perm==="default"?`<button class="ghost" id="askNotif">Turn on rest notifications</button>`:""}${on?`<button class="ghost" id="testNotif">Test the alert</button>`:""}</div>
   </div>`;
 }
+
 
 function render(){
   const v=$("#view"), d=$("#dock");
@@ -523,13 +529,39 @@ function goPage(delta){
   pageIdx=next; storePage(day); render(); window.scrollTo(0,0);
 }
 
-function setView(next){
+function showView(next){
   view=next;
   if(view.startsWith("d")){ draft=loadDraft(+view.slice(1)); pageIdx=loadPage(+view.slice(1)); }
   confirmDelete=null;
-  try{ if(location.hash!=="#"+view) history.replaceState(null,"","#"+view); }catch(e){}
   render(); window.scrollTo(0,0);
 }
+let leaving=false;
+function setView(next){
+  try{
+    if(next==="home"){
+      if(history.state && history.state.v && history.state.v!=="home"){ leaving=true; history.back(); return; }
+      history.replaceState({v:"home"},"","#home");
+    } else if(view==="home"){
+      history.pushState({v:next},"","#"+next);
+    } else {
+      history.replaceState({v:next},"","#"+next);
+    }
+  }catch(e){}
+  showView(next);
+}
+window.addEventListener("popstate",()=>{
+  if(leaving){ leaving=false; showView("home"); return; }
+  if(!$("#modal").hidden){                       // back closes an open pop-up first
+    closeModal();
+    try{ history.pushState({v:view},"","#"+view); }catch(e){}
+    return;
+  }
+  if(view.startsWith("d") && pageIdx>0){          // same confirmation as the arrow
+    try{ history.pushState({v:view},"","#"+view); }catch(e){}
+    openLeaveConfirm(); return;
+  }
+  showView("home");
+});
 
 /* ---------- Toast & modal ---------- */
 let toastT;
@@ -622,7 +654,7 @@ $("#view").addEventListener("click",async e=>{
   if(rm){ draft[rm.dataset.rmset].pop(); storeDraft(+view.slice(1)); render(); return; }
   if(t.id==="finish"){ finishWorkout(); return; }
   if(t.id==="exportBtn"){ exportBackup(); return; }
-  if(t.id==="testBuzz"){ if(!buzz()) toast("This phone didn't accept the vibration. Check its vibration settings."); return; }
+  if(t.id==="testNotif"){ buzz(); notifyRestOver("A2 (test)"); setTimeout(clearRestNotification,6000); return; }
   if(t.id==="askNotif"){ try{ Notification.requestPermission().then(()=>render()); }catch(e){} return; }
   if(t.id==="importBtn"){ $("#importFile").click(); return; }
   if(t.id==="installBtn" && installEvt){ installEvt.prompt(); installEvt.userChoice.finally(()=>{ installEvt=null; render(); }); return; }
@@ -679,6 +711,10 @@ $("#file").addEventListener("change",async e=>{
 (function initView(){
   const h=(location.hash||"").slice(1);
   view=["home","d1","d2","d3","history","settings"].includes(h)?h:"home";
+  try{
+    history.replaceState({v:"home"},"","#home");
+    if(view!=="home") history.pushState({v:view},"","#"+view);
+  }catch(e){}
   draft=loadDraft(+view.slice(1)||1);
   pageIdx=view.startsWith("d")?loadPage(+view.slice(1)):0;
   loadTimer();
@@ -813,7 +849,6 @@ window.addEventListener("appinstalled",()=>{ installEvt=null; if(view==="home") 
 })();
 
 /* ---------- Updates ---------- */
-const APP_VERSION="2";
 async function checkForUpdate(){
   if(!navigator.onLine) return;
   try{
