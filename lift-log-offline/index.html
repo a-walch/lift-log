@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Full-Body Lift Log</title>
+<title>Lift Log</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" id="themeColor" content="#121419">
 <link rel="icon" href="icon-192.png">
@@ -113,6 +113,9 @@ th{font-weight:600;color:var(--muted);font-size:13px}
 .hchip.prog{background:var(--warn-soft);color:var(--warn)}
 .hchip.next{background:var(--accent-soft);color:var(--accent)}
 .app-version{position:fixed;left:16px;bottom:calc(10px + env(safe-area-inset-bottom));margin:0;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.alt-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px}
+.alt-btn{font:700 24px var(--body);line-height:1;width:52px;height:40px;border-radius:8px;border:0;background:var(--accent-soft);color:var(--accent);cursor:pointer}
+.alt-count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:6px}
 .page-head h2{margin:12px 0 2px}
 .page-head .note{margin:0}
@@ -156,13 +159,13 @@ body.rest-over .dock{animation:pulse 1.2s ease-in-out 4}
 <div id="toast" class="toast" hidden></div>
 
 <script>
-var APP_VERSION="4";
-/* ---------- Program ---------- */
-const PULL_DAYS = {
-  1:{sets:4,reps:4,pct:0.85,label:"85%"},
-  2:{sets:3,reps:6,pct:0.75,label:"75%"},
-  3:{sets:5,reps:2,pct:0.90,label:"90%"}
-};
+var APP_VERSION="5";
+/* ---------- Program: Upper / Lower ---------- */
+const PULL_PHASES = [
+  {sets:4,reps:4,pct:0.85,label:"85%"},
+  {sets:3,reps:6,pct:0.75,label:"75%"},
+  {sets:5,reps:2,pct:0.90,label:"90%"}
+];
 const WARMUP = [
   {id:"m-wrist-circles",name:"Wrist circles",dose:"10 each direction",how:"Fingers interlaced, slow full circles."},
   {id:"m-wrist-rocks",name:"Wrist rocks, palms down",dose:"10 per hand position",how:"On hands and knees, fingers forward, then sideways, then back. Rock forward and back over the hands."},
@@ -170,7 +173,7 @@ const WARMUP = [
   {id:"m-palm-raises",name:"Palm raises",dose:"2 × 10–15",how:"On hands and knees, keep the fingers on the floor and lift the heels of the hands."},
   {id:"m-fingertip",name:"Fingertip push-offs",dose:"2 × 10",how:"On hands and knees, press through the fingertips so the palms lift; control the way down."},
   {id:"m-nerve-sliders",name:"Nerve sliders (seated)",dose:"10–15 each leg",how:"Straighten the knee while looking up, bend it while looking down. Smooth, no strong stretch."},
-  {id:"m-ramp",name:"Ramp-up sets",dose:"2–3 light sets",how:"A few light pull-up and leg press sets before the working weight."}
+  {id:"m-ramp",name:"Ramp-up sets",dose:"2–3 light sets",how:"A few light sets of the first exercise before the working weight."}
 ];
 const FLEX = [
   {id:"m-pancake",name:"Pancake (straddle) stretch",dose:"3 × 30–60 s",how:"Seated wide straddle, tilt the pelvis forward and walk the hands out with a flat back."},
@@ -178,58 +181,135 @@ const FLEX = [
   {id:"m-shoulder-ext",name:"Shoulder extension stretch",dose:"2 × 30 s",how:"Sit in front of a bench, hands on it behind you, slide the hips forward and down."},
   {id:"m-hip-flexor",name:"Kneeling hip flexor stretch",dose:"2 × 30–60 s each side",how:"Half-kneeling, squeeze the back glute and shift the hips forward; torso upright."}
 ];
-const BLOCKS = [
-  {id:"pullup",code:"A1",name:"Weighted pull-up",muscles:"Lats, upper back, biceps",pull:true,rest:"~2 min → A2",note:"Strength priority. Dead hang to chin over the bar, keep the plate still. On Day 3, do it alone without pairing."},
-  {id:"incline-db-press",code:"A2",name:"Incline dumbbell press",muscles:"Upper chest, front delts, triceps",sets:3,lo:6,hi:10,inc:2,rest:"~2 min → A1",note:"Bench at 30–45°. Weight is per dumbbell. Lower to the sides of the upper chest."},
-  {id:"single-leg-press",code:"B1",name:"Single-leg press",muscles:"Quads, glutes, adductors",sets:3,lo:8,hi:12,inc:5,rest:"~2 min → B2",note:"3 sets per leg at the same weight; log the reps of your weaker leg. Go deep (knee toward chest) but stop just before the lower back lifts off the pad. Start with the weaker leg and match its reps on the other."},
-  {id:"cable-lateral",code:"B2",name:"Cable lateral raise",muscles:"Side delts",sets:3,lo:10,hi:15,inc:1,rest:"~1.5 min → B1",note:"Cable crosses in front of the body; raise to shoulder height leading with the elbow."},
-  {id:"zercher-hinge",code:"C1",name:"Zercher hinge",muscles:"Hamstrings, glutes, lower back, core",sets:3,lo:8,hi:12,inc:2.5,rest:"~1.5 min → C2",note:"Bar in the crook of the elbows (pad or towel helps), knees nearly straight. Push the hips back to a strong hamstring stretch, back flat; stop where it starts to round. If the arms or upper back give out before the hamstrings, use a pad or lower the weight."},
-  {id:"seated-db-ohp",code:"C2",name:"Seated dumbbell overhead press",muscles:"Front delts, triceps, upper traps, serratus",sets:3,lo:6,hi:10,inc:2,rest:"~1.5 min → C1",note:"Bench upright, back supported. Press to full lockout with the biceps by the ears, the handstand position, and let the shoulder blades rotate up. Lower to about chin level. Weight is per dumbbell."},
-  {id:"chest-row",code:"D1",name:"Chest-supported row",muscles:"Mid/upper back, rear delts, lats",sets:3,lo:8,hi:12,inc:2.5,rest:"~1.5 min → D2",note:"Chest stays on the pad; pull the elbows back toward the hips."},
-  {id:"leg-ext",code:"D2",name:"Leg extension",muscles:"Quads (incl. rectus femoris)",sets:3,lo:10,hi:15,inc:2.5,rest:"~1.5 min → D3",note:"Recline the backrest a little if the machine allows."},
-  {id:"cable-fly",code:"D3",name:"Cable or machine chest fly",muscles:"Chest",sets:3,lo:10,hi:15,inc:2.5,rest:"~1.5 min → D1",note:"Slight elbow bend, open wide for a deep stretch, then bring the hands together."},
-  {id:"lying-leg-curl",code:"E1",name:"Lying leg curl",muscles:"Hamstrings (incl. short head)",sets:3,lo:10,hi:15,inc:2.5,rest:"~1 min → E2",note:"Bend the hips slightly: use the angled pad, let the hips rise a little, or put a folded towel under them, keeping the lower back neutral. Let the knees go almost straight at the bottom of every rep, curl fully, and lower over 2–3 s."},
-  {id:"overhead-triceps",code:"E2",name:"Overhead cable triceps extension",muscles:"Triceps (long head)",sets:3,lo:10,hi:15,inc:2.5,rest:"~1 min → E1",note:"Face away from the cable, elbows by the head, let the rope go deep behind the head."},
-  {id:"curl",code:"F1",variants:{1:{id:"preacher-curl",name:"Preacher curl",muscles:"Biceps"},2:{id:"hammer-preacher-curl",name:"Hammer preacher curl",muscles:"Brachialis, brachioradialis, biceps"},3:{id:"preacher-curl",name:"Preacher curl",muscles:"Biceps"}},sets:3,lo:8,hi:12,inc:1.25,rest:"~1 min → F2",note:"Lower until the elbow is almost straight, under control. No bouncing at the bottom."},
-  {id:"leg-press-calf",code:"F2",name:"Calf raise on the leg press",muscles:"Calves (gastrocnemius, soleus)",sets:3,lo:10,hi:15,inc:5,rest:"~1 min → F1",note:"Balls of the feet on the bottom edge of the platform, heels hanging off, knees straight but not locked hard. Lower until the heels are fully stretched, pause 1–2 s, then push all the way onto the toes. No bouncing. Keep the safety stops engaged and start light: the main risk is the feet slipping off the edge."},
-  {id:"cable-crunch",code:"G1",name:"Cable crunch (kneeling)",muscles:"Abs",sets:3,lo:8,hi:15,inc:2.5,rest:"~1 min → G2",note:"Hips stay still; curl the ribs toward the pelvis by rounding the spine."},
-  {id:"hanging-leg-raise",code:"G2",name:"Hanging leg raise (or captain's chair)",muscles:"Lower abs, hip flexors",sets:3,lo:8,hi:15,inc:0,bw:true,rest:"~1 min → G1",note:"Curl the pelvis up at the top. Leave weight empty for bodyweight."}
-];
-const NAMES = {}; [...WARMUP,...FLEX].forEach(m=>NAMES[m.id]=m.name);
-BLOCKS.forEach(b=>{ if(b.variants){Object.values(b.variants).forEach(v=>NAMES[v.id]=v.name)} else NAMES[b.id]=b.name; });
+const WORKOUTS = {
+  upper:{name:"Upper",slots:[
+    {code:"A1",rest:"~2 min → A2",alts:[
+      {id:"pullup",name:"Weighted pull-up",muscles:"Lats, upper back, biceps",pull:true,note:"Strength priority. Dead hang to chin over the bar, keep the plate still. On 90% sessions, do the pull-ups alone without pairing."},
+      {id:"weighted-chinup",name:"Weighted chin-up",muscles:"Lats, biceps, upper back",sets:4,lo:4,hi:6,inc:1,note:"Palms facing you, hands shoulder-width. Same dead hang and full range as the pull-up; the biceps work harder."},
+      {id:"lat-pulldown",name:"Lat pulldown",muscles:"Lats, upper back, biceps",sets:3,lo:6,hi:10,inc:2.5,note:"For when no bar is free. Pull the bar to the upper chest, elbows down and slightly back; full stretch at the top."}
+    ]},
+    {code:"A2",rest:"~2 min → A1",alts:[
+      {id:"incline-db-press",name:"Incline dumbbell press",muscles:"Upper chest, front delts, triceps",sets:3,lo:6,hi:10,inc:2,note:"Bench at 30–45°. Weight is per dumbbell. Lower to the sides of the upper chest."},
+      {id:"incline-bb-press",name:"Incline barbell press",muscles:"Upper chest, front delts, triceps",sets:3,lo:5,hi:8,inc:2.5,note:"Bench at 30–45°, grip a little wider than the shoulders, lower to the upper chest under control."},
+      {id:"incline-machine-press",name:"Incline machine press",muscles:"Upper chest, front delts, triceps",sets:3,lo:8,hi:12,inc:2.5,note:"Seat so the handles start at upper-chest height; deep stretch at the bottom without the shoulders rolling forward."},
+      {id:"weighted-dip",name:"Weighted dips",muscles:"Lower chest, triceps, front delts",sets:3,lo:6,hi:10,inc:2.5,note:"Lean slightly forward and lower until the shoulders are a little below the elbows, without pain. Good carryover to straight-bar dips."}
+    ]},
+    {code:"B1",rest:"~1.5 min → B2",alts:[
+      {id:"seated-db-ohp",name:"Seated dumbbell overhead press",muscles:"Front delts, triceps, upper traps, serratus",sets:3,lo:6,hi:10,inc:2,note:"Bench upright, back supported. Press to full lockout with the biceps by the ears, the handstand position. Lower to about chin level. Weight is per dumbbell."},
+      {id:"standing-ohp",name:"Standing barbell overhead press",muscles:"Front delts, triceps, upper traps, core",sets:3,lo:5,hi:8,inc:2.5,note:"Glutes and abs tight, bar from the collarbones to lockout over the mid-foot, head through at the top."},
+      {id:"machine-shoulder-press",name:"Machine shoulder press",muscles:"Front delts, triceps",sets:3,lo:8,hi:12,inc:2.5,note:"Handles at chin level at the bottom; press to full lockout."},
+      {id:"pike-pushup",name:"Pike push-up (feet raised)",muscles:"Front delts, triceps, upper traps",sets:3,lo:5,hi:10,inc:0,bw:true,note:"Hips high, the head travels in front of the hands to form a triangle. Raise the feet over the weeks; wall handstand push-ups are the next step. Leave weight empty."}
+    ]},
+    {code:"B2",rest:"~1.5 min → B1",alts:[
+      {id:"chest-row",name:"Chest-supported row",muscles:"Upper back, rear delts, mid traps",sets:3,lo:8,hi:12,inc:2.5,note:"Wide overhand grip, elbows out at 45–70°, pull toward the lower chest. Squeeze the shoulder blades at the top, let them spread at the bottom."},
+      {id:"seated-cable-row",name:"Seated cable row (wide bar)",muscles:"Upper back, rear delts, lats",sets:3,lo:8,hi:12,inc:2.5,note:"Torso still and upright, elbows out, pull to the lower chest; let the shoulder blades spread forward at the stretch."},
+      {id:"one-arm-db-row",name:"One-arm dumbbell row",muscles:"Lats, mid back, rear delts",sets:3,lo:8,hi:12,inc:2,note:"Knee and hand on a bench, pull the dumbbell toward the hip, full stretch at the bottom. Log the reps per side."}
+    ]},
+    {code:"C1",rest:"~1.5 min → C2",alts:[
+      {id:"cable-fly",name:"Cable chest fly",muscles:"Chest",sets:3,lo:10,hi:15,inc:2.5,note:"Slight elbow bend, open wide for a deep stretch, then bring the hands together."},
+      {id:"pec-deck",name:"Pec deck",muscles:"Chest",sets:3,lo:10,hi:15,inc:2.5,note:"Handles level with the chest; let the arms open to a full stretch, squeeze together."},
+      {id:"db-fly",name:"Dumbbell fly",muscles:"Chest",sets:3,lo:10,hi:15,inc:2,note:"Flat or slight incline, elbows slightly bent and fixed; lower until a deep chest stretch. Weight is per dumbbell."}
+    ]},
+    {code:"C2",rest:"~1.5 min → C1",alts:[
+      {id:"cable-lateral",name:"Cable lateral raise",muscles:"Side delts",sets:3,lo:10,hi:15,inc:1,note:"Cable crosses in front of the body; raise to shoulder height leading with the elbow."},
+      {id:"db-lateral",name:"Dumbbell lateral raise",muscles:"Side delts",sets:3,lo:12,hi:20,inc:1,note:"Slight forward lean, raise to shoulder height leading with the elbows, no swinging. Weight is per dumbbell."},
+      {id:"machine-lateral",name:"Machine lateral raise",muscles:"Side delts",sets:3,lo:10,hi:15,inc:2.5,note:"Pads on the outside of the arms, shoulders down; raise to shoulder height."}
+    ]},
+    {code:"D1",rest:"~1 min → D2",alts:[
+      {id:"overhead-triceps",name:"Overhead cable triceps extension",muscles:"Triceps (long head)",sets:3,lo:10,hi:15,inc:2.5,note:"Face away from the cable, elbows by the head, let the rope go deep behind the head."},
+      {id:"db-overhead-triceps",name:"Dumbbell overhead triceps extension",muscles:"Triceps (long head)",sets:3,lo:10,hi:15,inc:2,note:"One dumbbell held with both hands, elbows pointing up; lower deep behind the head."},
+      {id:"ez-skullcrusher",name:"EZ-bar skull crusher",muscles:"Triceps",sets:3,lo:8,hi:12,inc:2.5,note:"Lower the bar behind the head rather than to the forehead, for more stretch on the long head."}
+    ]},
+    {code:"D2",rest:"~1 min → D1",alts:[
+      {id:"preacher-curl",name:"Preacher curl",muscles:"Biceps",sets:3,lo:8,hi:12,inc:1.25,note:"Lower until the elbow is almost straight, under control. No bouncing at the bottom."},
+      {id:"hammer-preacher-curl",name:"Hammer preacher curl",muscles:"Brachialis, brachioradialis, biceps",sets:3,lo:8,hi:12,inc:1.25,note:"Neutral grip shifts work to the brachialis and brachioradialis, which help in one-arm pull-ups. Same full stretch at the bottom."},
+      {id:"incline-db-curl",name:"Incline dumbbell curl",muscles:"Biceps (long head)",sets:3,lo:8,hi:12,inc:1,note:"Bench at 45–60°, arms hanging straight behind the torso, no swinging. Weight is per dumbbell."},
+      {id:"bayesian-curl",name:"Bayesian cable curl",muscles:"Biceps (long head)",sets:3,lo:10,hi:15,inc:1,note:"Face away from a low cable, arm behind the body; curl without moving the elbow forward. Log the reps per arm."}
+    ]}
+  ]},
+  lower:{name:"Lower",slots:[
+    {code:"A1",rest:"~2 min → A2",alts:[
+      {id:"single-leg-press",name:"Single-leg press",muscles:"Quads, glutes, adductors",sets:3,lo:8,hi:12,inc:5,note:"3 sets per leg at the same weight; log the reps of your weaker leg. Go deep (knee toward chest) but stop just before the lower back lifts off the pad."},
+      {id:"back-squat",name:"Back squat",muscles:"Quads, glutes, adductors",sets:3,lo:5,hi:8,inc:2.5,note:"At least thighs parallel, chest up, knees tracking over the toes."},
+      {id:"hack-squat",name:"Hack squat",muscles:"Quads, glutes",sets:3,lo:6,hi:10,inc:5,note:"Feet mid-platform, go as deep as the hips allow without the lower back leaving the pad."},
+      {id:"bulgarian-split-squat",name:"Bulgarian split squat",muscles:"Quads, glutes, adductors",sets:3,lo:8,hi:12,inc:2,note:"Rear foot on a bench, lower until the back knee nearly touches the floor. Weight is per dumbbell; log the weaker leg."}
+    ]},
+    {code:"A2",rest:"~1.5 min → A1",alts:[
+      {id:"cable-crunch",name:"Cable crunch (kneeling)",muscles:"Abs",sets:3,lo:8,hi:15,inc:2.5,note:"Hips stay still; curl the ribs toward the pelvis by rounding the spine."},
+      {id:"ab-wheel",name:"Ab wheel rollout",muscles:"Abs, lats",sets:3,lo:6,hi:12,inc:0,bw:true,note:"From the knees, roll out with a slightly rounded back and the hips tucked; go only as far as you can come back. Leave weight empty."}
+    ]},
+    {code:"B1",rest:"~1.5 min → B2",alts:[
+      {id:"zercher-hinge",name:"Zercher hinge",muscles:"Hamstrings, glutes, lower back, core",sets:3,lo:8,hi:12,inc:2.5,note:"Bar in the crook of the elbows (pad or towel helps), knees nearly straight. Push the hips back to a strong hamstring stretch, back flat; stop where it starts to round."},
+      {id:"rdl",name:"Romanian deadlift",muscles:"Hamstrings, glutes",sets:3,lo:6,hi:10,inc:2.5,note:"Hips back, soft knees, flat back; lower to a strong hamstring stretch (about mid-shin). Straps if the grip is tired."},
+      {id:"back-extension",name:"45° back extension (hamstring focus)",muscles:"Hamstrings, glutes, lower back",sets:3,lo:10,hi:15,inc:2.5,note:"Pad just below the hip bones, hinge at the hips with a flat back; hold a plate to load it."}
+    ]},
+    {code:"B2",rest:"~1.5 min → B1",alts:[
+      {id:"hanging-leg-raise",name:"Hanging leg raise",muscles:"Lower abs, hip flexors",sets:3,lo:8,hi:15,inc:0,bw:true,note:"Curl the pelvis up at the top. Leave weight empty for bodyweight."},
+      {id:"captains-chair",name:"Captain's chair leg raise",muscles:"Lower abs, hip flexors",sets:3,lo:10,hi:15,inc:0,bw:true,note:"Back against the pad, raise the legs and curl the pelvis up. Use it when the grip is tired."}
+    ]},
+    {code:"C1",rest:"~1.5 min → C2",alts:[
+      {id:"leg-ext",name:"Leg extension",muscles:"Quads (incl. rectus femoris)",sets:3,lo:10,hi:15,inc:2.5,note:"Recline the backrest a little if the machine allows."},
+      {id:"reverse-nordic",name:"Reverse Nordic",muscles:"Quads (rectus femoris)",sets:3,lo:6,hi:12,inc:0,bw:true,note:"Kneel with the body straight from knees to head and lean back slowly, then come back up. Leave weight empty."}
+    ]},
+    {code:"C2",rest:"~1.5 min → C1",alts:[
+      {id:"lying-leg-curl",name:"Lying leg curl",muscles:"Hamstrings (incl. short head)",sets:3,lo:10,hi:15,inc:2.5,note:"Bend the hips slightly (angled pad, hips a little up, or a towel under them). Knees almost straight at the bottom, curl fully, lower over 2–3 s."},
+      {id:"seated-leg-curl",name:"Seated leg curl",muscles:"Hamstrings",sets:3,lo:10,hi:15,inc:2.5,note:"If another gym has one: thigh pad down tight, full curl, controlled return."},
+      {id:"nordic-curl",name:"Nordic curl",muscles:"Hamstrings",sets:3,lo:3,hi:6,inc:0,bw:true,note:"Ankles anchored, lower the body forward as slowly as possible, catch yourself with the hands and push back up. Leave weight empty."}
+    ]},
+    {code:"D1",rest:"~1 min → D1",alts:[
+      {id:"leg-press-calf",name:"Calf raise on the leg press",muscles:"Calves",sets:4,lo:10,hi:15,inc:5,note:"Balls of the feet on the bottom edge, heels hanging off, knees straight. Lower to a full stretch, pause 1–2 s, push all the way up. Safety stops engaged; start light."},
+      {id:"standing-calf",name:"Standing calf raise",muscles:"Calves",sets:4,lo:10,hi:15,inc:2.5,note:"Knees straight. Pause 1–2 s at the bottom stretch, then rise all the way."},
+      {id:"single-leg-calf",name:"Single-leg calf raise on a step",muscles:"Calves",sets:4,lo:10,hi:15,inc:2,note:"Hold a dumbbell on the working side, heel drops below the step, pause at the bottom. Log the weaker leg."}
+    ]}
+  ]}
+};
+const WKEYS=Object.keys(WORKOUTS);
+const isW=v=>WKEYS.includes(v);
+const NAMES = {}, BWIDS = {};
+[...WARMUP,...FLEX].forEach(m=>NAMES[m.id]=m.name);
+WKEYS.forEach(k=>WORKOUTS[k].slots.forEach(sl=>sl.alts.forEach(a=>{ NAMES[a.id]=a.name; if(a.bw) BWIDS[a.id]=true; })));
 
-function exFor(b, day){
-  if(b.pull){ const p=PULL_DAYS[day]; return {...b, sets:p.sets, lo:p.reps, hi:p.reps}; }
-  if(b.variants){ const v=b.variants[day]; return {...b, id:v.id, name:v.name, muscles:v.muscles}; }
-  return b;
+/* the pull-up intensity rotates 85% → 75% → 90% across upper sessions */
+function phaseOfWorkout(w){ if(typeof w.pullPhase==="number") return w.pullPhase; if(w.day) return w.day-1; return null; }
+function nextPullPhase(){
+  for(const w of workouts){ if(w.entries && w.entries.pullup){ const p=phaseOfWorkout(w); if(p!==null) return (p+1)%3; } }
+  return 0;
+}
+function curPhase(){ if(typeof draft._phase!=="number") draft._phase=nextPullPhase(); return draft._phase; }
+function selIdx(code){ return (draft._sel && draft._sel[code]) || 0; }
+function exFor(slot, i){
+  const a=slot.alts[i===undefined?selIdx(slot.code):i];
+  const ex={...a, code:slot.code, rest:slot.rest};
+  if(a.pull){ const p=PULL_PHASES[curPhase()]; ex.sets=p.sets; ex.lo=p.reps; ex.hi=p.reps; ex.phase=curPhase(); }
+  return ex;
 }
 
 /* ---------- State ---------- */
 let db=null, assets=null, uid=null, profileRef=null, workoutsCol=null;
 let profile={bw:73, max:65, images:{}};
 let profileLoaded=false, workouts=[], workoutsLoaded=false;
-let view="d1", draft={}, saving=false;
+let view="home", draft={}, saving=false;
 let confirmDelete=null;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num=v=>{ if(v===null||v===undefined) return NaN; const n=parseFloat(String(v).replace(",",".")); return n; };
 const fmt=n=>{ if(!isFinite(n)) return ""; return (Math.round(n*100)/100).toString(); };
 
-function pullTarget(day){
-  const p=PULL_DAYS[day]; const total=profile.bw+profile.max;
+function pullTarget(phase){
+  const p=PULL_PHASES[phase]; const total=profile.bw+profile.max;
   return Math.floor(total*p.pct - profile.bw);
 }
 
 /* ---------- Draft (one viewer's unsent workout, browser only) ---------- */
-function draftKey(day){ return "liftlog-draft-d"+day; }
-function loadDraft(day){ try{ const s=localStorage.getItem(draftKey(day)); return s?JSON.parse(s):{}; }catch(e){ return {}; } }
-function storeDraft(day){ try{ localStorage.setItem(draftKey(day), JSON.stringify(draft)); }catch(e){} }
-function clearDraft(day){ try{ localStorage.removeItem(draftKey(day)); }catch(e){} }
+function draftKey(k){ return "liftlog-draft-"+k; }
+function loadDraft(k){ try{ const s=localStorage.getItem(draftKey(k)); return s?JSON.parse(s):{}; }catch(e){ return {}; } }
+function storeDraft(k){ try{ localStorage.setItem(draftKey(k), JSON.stringify(draft)); }catch(e){} }
+function clearDraft(k){ try{ localStorage.removeItem(draftKey(k)); }catch(e){} }
 
 /* ---------- History helpers ---------- */
-function lastFor(exId, day){
+function lastFor(exId, phase){
   for(const w of workouts){
-    if(exId==="pullup" && w.day!==day) continue;
+    if(exId==="pullup" && phaseOfWorkout(w)!==phase) continue;
     const s=w.entries && w.entries[exId];
     if(s && s.length) return {w, sets:s};
   }
@@ -244,10 +324,10 @@ function setsText(sets, bw, pull){
 }
 
 /* Suggestion: {weight, text, kind: up|hold|base|none} */
-function suggest(ex, day){
-  const last=lastFor(ex.id==="pullup"?"pullup":ex.id, day);
+function suggest(ex){
+  const last=lastFor(ex.id, ex.phase);
   if(ex.pull){
-    const t=pullTarget(day), p=PULL_DAYS[day];
+    const t=pullTarget(ex.phase), p=PULL_PHASES[ex.phase];
     if(last){
       const lw=Math.max(...last.sets.map(s=>s.w||0));
       const done=last.sets.length>=p.sets && last.sets.every(s=>s.r>=p.reps);
@@ -289,25 +369,27 @@ function mobilityHtml(list){
     </div>`).join("")}</div>`;
 }
 
-function dayPages(){
+function dayPages(k){
   const groups=[];
-  for(const b of BLOCKS){ const L=b.code[0]; let g=groups.find(x=>x.letter===L); if(!g){ g={type:"pair",letter:L,blocks:[]}; groups.push(g); } g.blocks.push(b); }
+  for(const sl of WORKOUTS[k].slots){ const L=sl.code[0]; let g=groups.find(x=>x.letter===L); if(!g){ g={type:"pair",letter:L,slots:[]}; groups.push(g); } g.slots.push(sl); }
   return [{type:"warm"}, ...groups, {type:"flex"}];
 }
 let pageIdx=0;
-function pageKey(day){ return "liftlog-page-d"+day; }
-function loadPage(day){ try{ const n=parseInt(localStorage.getItem(pageKey(day)),10); return isFinite(n)?n:0; }catch(e){ return 0; } }
-function storePage(day){ try{ localStorage.setItem(pageKey(day), String(pageIdx)); }catch(e){} }
+function pageKey(k){ return "liftlog-page-"+k; }
+function loadPage(k){ try{ const n=parseInt(localStorage.getItem(pageKey(k)),10); return isFinite(n)?n:0; }catch(e){ return 0; } }
+function storePage(k){ try{ localStorage.setItem(pageKey(k), String(pageIdx)); }catch(e){} }
 
-function exerciseCard(b, day){
-  const ex=exFor(b,day);
-  const sug=suggest(ex,day);
-  const last=lastFor(ex.id,day);
+function exerciseCard(slot){
+  const ex=exFor(slot);
+  const sug=suggest(ex);
+  const last=lastFor(ex.id,ex.phase);
+  const n=slot.alts.length, si=selIdx(slot.code);
+  const altNav = n>1 ? `<div class="alt-nav"><button class="alt-btn" data-alt="${esc(slot.code)}" data-dir="-1" aria-label="Previous alternative">‹</button><span class="alt-count">Option ${si+1}/${n}</span><button class="alt-btn" data-alt="${esc(slot.code)}" data-dir="1" aria-label="Next alternative">›</button></div>` : "";
   const rows=draft[ex.id] || Array.from({length:ex.sets},()=>({w:"",r:""}));
   if(!draft[ex.id]) draft[ex.id]=rows;
   const repsPh = ex.lo===ex.hi ? String(ex.lo) : `${ex.lo}–${ex.hi}`;
   const wPh = sug.weight!==null && sug.weight!==undefined ? (ex.pull?"+":"")+fmt(sug.weight) : (ex.bw?"BW":"kg");
-  const scheme = ex.pull ? `${ex.sets} × ${ex.lo} @ ${PULL_DAYS[day].label}` : `${ex.sets} × ${ex.lo}–${ex.hi}`;
+  const scheme = ex.pull ? `${ex.sets} × ${ex.lo} @ ${PULL_PHASES[ex.phase].label}` : `${ex.sets} × ${ex.lo}–${ex.hi}`;
   return `
     <article class="card" data-ex="${esc(ex.id)}">
       <div class="ex-head">
@@ -318,6 +400,7 @@ function exerciseCard(b, day){
         </div>
         ${imgHtml(ex.id,ex.name)}
       </div>
+      ${altNav}
       <div class="rx"><span class="chip">${esc(scheme)}</span><span class="chip">Rest ${esc(ex.rest)}</span></div>
       <div class="sug ${sug.kind==="up"?"up":sug.kind==="hold"?"hold":""}">${sug.text}</div>
       ${last?`<div class="last">Last (${esc(shortDate(last.w.date))}): ${esc(setsText(last.sets, ex.bw, ex.pull))}</div>`:""}
@@ -341,36 +424,36 @@ function exerciseCard(b, day){
 function restSeconds(rest){ const m=String(rest).match(/([\d.]+)\s*min/); return m?Math.round(parseFloat(m[1])*60):90; }
 function restNext(rest){ const m=String(rest).match(/→\s*(\S+)/); return m?m[1]:""; }
 
-function dayHtml(day){
-  const pages=dayPages();
+function dayHtml(k){
+  const pages=dayPages(k);
   if(pageIdx<0||pageIdx>=pages.length) pageIdx=0;
-  const p=pages[pageIdx], total=pages.length, isLast=p.type==="pair" && pages[pageIdx+1] && pages[pageIdx+1].type==="flex";
+  const p=pages[pageIdx], isLast=p.type==="pair" && pages[pageIdx+1] && pages[pageIdx+1].type==="flex";
   const parts=[];
   if(p.type==="warm"){
     parts.push(`<div class="page-head"><div><h2>Warm-up · 5 min</h2><p class="note">Before lifting, every session.</p></div></div>`);
     parts.push(mobilityHtml(WARMUP));
   } else if(p.type==="flex"){
-    parts.push(`<div class="page-head"><div><h2>Flexibility</h2><p class="note">After training, 3–5× a week. Strong but tolerable stretch, never sharp pain.</p></div></div>`);
+    parts.push(`<div class="page-head"><div><h2>Flexibility</h2><p class="note">After training. Strong but tolerable stretch, never sharp pain.</p></div></div>`);
     parts.push(mobilityHtml(FLEX));
   } else {
-    const exs=p.blocks.map(b=>exFor(b,day));
-    const kind=exs.length>2?"Trio":"Pair";
+    const exs=p.slots.map(sl=>exFor(sl));
+    const kind=exs.length>2?"Trio":exs.length===1?"Single":"Pair";
     parts.push(`<div class="page-head"><div><h2>Block ${esc(p.letter)} · ${kind}</h2><p class="note">${exs.map(e=>esc(e.code)+" "+esc(e.name)).join(" ↔ ")}</p></div></div>`);
-    if(p.letter==="A" && day===3) parts.push(`<p class="note">Day 3: do the pull-ups alone first, then the press. No pairing on the 90% sets.</p>`);
-    parts.push(`<div class="list">`+p.blocks.map(b=>exerciseCard(b,day)).join("")+`</div>`);
+    if(exs.some(e=>e.pull && e.phase===2)) parts.push(`<p class="note">90% session: do the pull-ups alone first, then the other exercise.</p>`);
+    parts.push(`<div class="list">`+p.slots.map(sl=>exerciseCard(sl)).join("")+`</div>`);
     if(isLast){
-      parts.push(`<p class="note" style="margin-top:12px">Empty weight boxes use the grey suggested weight when you save. Only sets with reps filled in are saved. On weeks with 3 sessions, you can drop blocks C–G to 2 sets (keep calves at 3).</p>`);
+      parts.push(`<p class="note" style="margin-top:12px">Empty weight boxes use the grey suggested weight when you save. Only sets with reps filled in are saved, including sets logged on an alternative you switched away from.</p>`);
       parts.push(`<button class="primary" id="finish" ${(!db||saving)?"disabled":""}>${saving?"Saving…":"Finish & save workout"}</button><p class="note">Then go to the next page for the flexibility routine.</p>`);
     }
   }
   return parts.join("");
 }
 
-function dockHtml(day){
-  const pages=dayPages(); const p=pages[pageIdx]; const total=pages.length;
+function dockHtml(k){
+  const pages=dayPages(k); const p=pages[pageIdx]; const total=pages.length;
   let restBtns="";
   if(p && p.type==="pair"){
-    restBtns=p.blocks.map(b=>{ const ex=exFor(b,day); const s=restSeconds(ex.rest); const nx=restNext(ex.rest);
+    restBtns=p.slots.map(sl=>{ const ex=exFor(sl); const s=restSeconds(ex.rest); const nx=restNext(ex.rest);
       return `<button class="rest-btn" data-rest="${s}" data-next="${esc(nx)}" data-from="${esc(ex.code)}">After ${esc(ex.code)} · rest ${fmtClock(s)}</button>`; }).join("");
   }
   return `<div id="timer" class="timer">${restBtns?`<div class="rest-row">${restBtns}</div>`:""}</div>
@@ -413,7 +496,7 @@ function fireDone(){
 }
 function renderTimer(){
   const el=$("#timer"); if(!el) return;
-  if(!timer){ const day=+view.slice(1); const d=$("#dock"); if(d && view.startsWith("d")) d.innerHTML=dockHtml(day); return; }
+  if(!timer){ const d=$("#dock"); if(d && isW(view)) d.innerHTML=dockHtml(view); return; }
   if(timer.done){
     el.innerHTML=`<div class="t-done" role="alert"><div><div class="t-big">Rest over</div><div class="note">${timer.next?"Go: "+esc(timer.next):"Next set"}</div></div><button class="primary t-ok" data-tstop>OK</button></div>`;
     return;
@@ -435,25 +518,30 @@ function tick(){
 setInterval(tick,250);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ tick(); if(timer&&!timer.done) holdScreen(true); } });
 
-function dayInProgress(day){
-  let p=0; try{ p=parseInt(localStorage.getItem(pageKey(day)),10)||0; }catch(e){}
-  const d=loadDraft(day);
-  const any=Object.values(d).some(rows=>Array.isArray(rows)&&rows.some(r=>String(r.r||"").trim()!==""));
+function dayInProgress(k){
+  let p=0; try{ p=parseInt(localStorage.getItem(pageKey(k)),10)||0; }catch(e){}
+  const d=loadDraft(k);
+  if(d._finished) return -1;
+  const any=Object.entries(d).some(([key,rows])=>key[0]!=="_" && Array.isArray(rows)&&rows.some(r=>String(r.r||"").trim()!==""));
   return (p>0||any)?p:-1;
 }
 function homeHtml(){
-  const total=dayPages().length;
-  const next = workouts.length ? (workouts[0].day%3)+1 : 1;
-  const subs={1:`Pull-ups 4×4 @ 85% (+${pullTarget(1)} kg) · preacher curl`,2:`Pull-ups 3×6 @ 75% (+${pullTarget(2)} kg) · hammer curl`,3:`Pull-ups 5×2 @ 90% (+${pullTarget(3)} kg), done alone · preacher curl`};
-  const days=[1,2,3].map(d=>{
-    const ip=dayInProgress(d);
-    const chips=[ip>=0?`<span class="hchip prog">In progress · page ${ip+1}/${total}</span>`:"", (workoutsLoaded&&d===next)?`<span class="hchip next">Next up</span>`:""].join("");
-    return `<button class="home-btn" data-go="d${d}"><span class="hb-main">Day ${d}</span><span class="hb-sub">${esc(subs[d])}</span>${chips?`<span class="hchips">${chips}</span>`:""}</button>`;
+  const last=workouts[0];
+  const next = last && last.type==="upper" ? "lower" : (last && last.type==="lower" ? "upper" : "upper");
+  const d=loadDraft("upper");
+  const ph = typeof d._phase==="number" ? d._phase : nextPullPhase();
+  const pp=PULL_PHASES[ph];
+  const subs={upper:`Pull-ups ${pp.sets}×${pp.reps} @ ${pp.label} (+${pullTarget(ph)} kg) · presses · rows · shoulders · arms`,lower:"Legs · hamstrings · calves · abs"};
+  const btns=WKEYS.map(k=>{
+    const total=dayPages(k).length, ip=dayInProgress(k);
+    const chips=[ip>=0?`<span class="hchip prog">In progress · page ${ip+1}/${total}</span>`:"", (workoutsLoaded&&k===next)?`<span class="hchip next">Next up</span>`:""].join("");
+    return `<button class="home-btn" data-go="${k}"><span class="hb-main">${esc(WORKOUTS[k].name)}</span><span class="hb-sub">${esc(subs[k])}</span>${chips?`<span class="hchips">${chips}</span>`:""}</button>`;
   }).join("");
   const lastTxt = workouts.length ? `${workouts.length} saved · last ${esc(shortDate(workouts[0].date))}` : "No workouts saved yet";
   const install = installEvt ? `<button class="primary" id="installBtn" style="margin:0 0 12px">Install app on this phone</button>` : "";
-  return `<h1 class="home-title">Full-body lift log</h1>${install}
-  <div class="home-grid">${days}
+  return `<h1 class="home-title">Lift log</h1>${install}
+  <div class="home-grid">${btns}
+    <p class="note" style="margin:0">Alternate upper and lower. 4 sessions a week trains each muscle twice; 3 a week also works.</p>
     <div class="home-row">
       <button class="home-btn small" data-go="history"><span class="hb-main">History</span><span class="hb-sub">${lastTxt}</span></button>
       <button class="home-btn small" data-go="settings"><span class="hb-main">Max &amp; weight</span><span class="hb-sub">${fmt(profile.bw)} kg · max +${fmt(profile.max)} kg</span></button>
@@ -462,26 +550,26 @@ function homeHtml(){
   <p class="app-version">Version ${APP_VERSION}</p>`;
 }
 function openLeaveConfirm(){
-  const day=+view.slice(1), total=dayPages().length;
+  const name=WORKOUTS[view].name, total=dayPages(view).length;
   const m=$("#modal");
   m.innerHTML=`<div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="cTitle">
-    <h3 id="cTitle">Leave Day ${day}?</h3>
-    <p class="note" style="font-size:15px">You're on page ${pageIdx+1}/${total}. What you've entered is kept on this phone, and Day ${day} will reopen on this page. Nothing is saved to your history until you tap Finish.</p>
+    <h3 id="cTitle">Leave ${esc(name)}?</h3>
+    <p class="note" style="font-size:15px">You're on page ${pageIdx+1}/${total}. What you've entered is kept on this phone, and ${esc(name)} will reopen on this page. Nothing is saved to your history until you tap Finish.</p>
     <div class="row-btns"><button class="ghost" id="cLeave">Leave to home</button><button class="primary t-ok" id="cStay" style="margin-left:auto">Stay</button></div>
   </div>`;
   m.hidden=false; $("#cStay").focus();
 }
 function historyHtml(){
   if(!workoutsLoaded) return `<p class="note">Loading your history…</p>`;
-  if(!workouts.length) return `<h2>History</h2><p class="note">No workouts saved yet. Finish a day and it shows up here.</p>`;
+  if(!workouts.length) return `<h2>History</h2><p class="note">No workouts saved yet. Finish a workout and it shows up here.</p>`;
   return `<h2>History · ${workouts.length} workout${workouts.length>1?"s":""}</h2><div class="list">${workouts.map(w=>{
     const lines=Object.entries(w.entries||{}).map(([id,sets])=>{
-      const b=BLOCKS.find(x=>x.id===id); const bw=b&&b.bw;
+      const bw=!!BWIDS[id];
       return `<div><strong>${esc(NAMES[id]||id)}</strong>: ${esc(setsText(sets,bw,id==="pullup"))}</div>`;
     }).join("");
     const confirming = confirmDelete===w._id;
     return `<div class="card hist-item">
-      <div class="hist-top"><strong>Day ${esc(w.day)} · ${esc(new Date(w.date).toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"}))}</strong>
+      <div class="hist-top"><strong>${esc(w.type?WORKOUTS[w.type].name:"Day "+w.day)}${w.entries&&w.entries.pullup&&phaseOfWorkout(w)!==null?" · pull-ups "+PULL_PHASES[phaseOfWorkout(w)].label:""} · ${esc(new Date(w.date).toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"}))}</strong>
       <button class="ghost ${confirming?"danger":""}" data-del="${esc(w._id)}">${confirming?"Tap again to delete":"Delete"}</button></div>
       <div class="hist-lines">${lines}</div></div>`;
   }).join("")}</div>`;
@@ -489,7 +577,8 @@ function historyHtml(){
 
 function settingsHtml(){
   const total=profile.bw+profile.max;
-  const rows=[1,2,3].map(d=>{const p=PULL_DAYS[d]; return `<tr><td>Day ${d}</td><td>${p.sets}×${p.reps}</td><td>${p.label}</td><td>${fmt(total*p.pct)} kg</td><td><strong>+${fmt(pullTarget(d))} kg</strong></td></tr>`}).join("");
+  const nx=nextPullPhase();
+  const rows=PULL_PHASES.map((p,i)=>`<tr><td>${i+1}${i===nx?" (next)":""}</td><td>${p.sets}×${p.reps}</td><td>${p.label}</td><td>${fmt(total*p.pct)} kg</td><td><strong>+${fmt(pullTarget(i))} kg</strong></td></tr>`).join("");
   return `<h2>Max &amp; bodyweight</h2>
   <div class="card">
     <div class="field"><label for="bw">Bodyweight (kg)</label><input id="bw" inputmode="decimal" value="${esc(fmt(profile.bw))}"></div>
@@ -498,7 +587,8 @@ function settingsHtml(){
     <p class="note">Total max: ${fmt(total)} kg. Pull-up loads are calculated on the total (bodyweight + added), then rounded down to the kilo.</p>
   </div>
   <h2>Pull-up loads</h2>
-  <div class="card" style="overflow-x:auto"><table><thead><tr><th>Day</th><th>Sets</th><th>%</th><th>Total</th><th>Added</th></tr></thead><tbody>${rows}</tbody></table></div>`+alertsHtml()+backupHtml();
+  <p class="note">The intensity rotates by itself across upper sessions: 85%, then 75%, then 90%.</p>
+  <div class="card" style="overflow-x:auto"><table><thead><tr><th>Session</th><th>Sets</th><th>%</th><th>Total</th><th>Added</th></tr></thead><tbody>${rows}</tbody></table></div>`+alertsHtml()+backupHtml();
 }
 function alertsHtml(){
   const perm = ("Notification" in window) ? Notification.permission : "unsupported";
@@ -515,23 +605,25 @@ function alertsHtml(){
 
 function render(){
   const v=$("#view"), d=$("#dock");
-  const titles={d1:"Day 1",d2:"Day 2",d3:"Day 3",history:"History",settings:"Max & weight"};
   $("#top").hidden = view==="home";
   const st=$("#status"); st.hidden = view!=="home" && !st.classList.contains("warn");
   if(view==="home"){ d.hidden=true; d.innerHTML=""; v.innerHTML=homeHtml(); }
-  else if(view.startsWith("d")){ const day=+view.slice(1); v.innerHTML=dayHtml(day); d.innerHTML=dockHtml(day); d.hidden=false; renderTimer(); }
+  else if(isW(view)){ v.innerHTML=dayHtml(view); d.innerHTML=dockHtml(view); d.hidden=false; renderTimer(); }
   else { d.hidden=true; d.innerHTML=""; v.innerHTML = view==="history"?historyHtml():settingsHtml(); }
 }
 function goPage(delta){
-  const day=+view.slice(1), n=dayPages().length;
+  const n=dayPages(view).length;
   const next=Math.max(0,Math.min(n-1,pageIdx+delta));
   if(next===pageIdx) return;
-  pageIdx=next; storePage(day); render(); window.scrollTo(0,0);
+  pageIdx=next; storePage(view); render(); window.scrollTo(0,0);
 }
 
 function showView(next){
   view=next;
-  if(view.startsWith("d")){ draft=loadDraft(+view.slice(1)); pageIdx=loadPage(+view.slice(1)); }
+  if(isW(view)){
+    draft=loadDraft(view); pageIdx=loadPage(view);
+    if(draft._finished){ draft={}; clearDraft(view); pageIdx=0; storePage(view); }
+  }
   confirmDelete=null;
   render(); window.scrollTo(0,0);
 }
@@ -556,7 +648,7 @@ window.addEventListener("popstate",()=>{
     try{ history.pushState({v:view},"","#"+view); }catch(e){}
     return;
   }
-  if(view.startsWith("d") && pageIdx>0){          // same confirmation as the arrow
+  if(isW(view) && pageIdx>0){          // same confirmation as the arrow
     try{ history.pushState({v:view},"","#"+view); }catch(e){}
     openLeaveConfirm(); return;
   }
@@ -595,30 +687,35 @@ function saveProfile(){
 }
 
 async function finishWorkout(){
-  const day=+view.slice(1);
+  const k=view;
   const entries={};
-  for(const b of BLOCKS){
-    const ex=exFor(b,day);
-    const sug=suggest(ex,day);
-    const rows=draft[ex.id]||[];
-    const sets=[];
-    for(const r of rows){
-      const reps=parseInt(r.r,10);
-      if(!(reps>0)) continue;
-      let w=num(r.w);
-      if(!isFinite(w)) w = (sug.weight!==null&&sug.weight!==undefined) ? sug.weight : 0;
-      sets.push({w:Math.round(w*100)/100, r:reps});
-    }
-    if(sets.length) entries[ex.id]=sets;
+  let usedPull=false;
+  for(const slot of WORKOUTS[k].slots){
+    slot.alts.forEach((a,i)=>{
+      const ex=exFor(slot,i);
+      const sug=suggest(ex);
+      const rows=draft[ex.id]||[];
+      const sets=[];
+      for(const r of rows){
+        const reps=parseInt(r.r,10);
+        if(!(reps>0)) continue;
+        let w=num(r.w);
+        if(!isFinite(w)) w = (sug.weight!==null&&sug.weight!==undefined) ? sug.weight : 0;
+        sets.push({w:Math.round(w*100)/100, r:reps});
+      }
+      if(sets.length){ entries[ex.id]=sets; if(ex.pull) usedPull=true; }
+    });
   }
   if(!Object.keys(entries).length){ toast("Fill in the reps of at least one set first."); return; }
   saving=true; render();
   try{
-    await workoutsCol.add({date:new Date().toISOString(), day, entries});
-    draft={}; clearDraft(day);
+    const rec={date:new Date().toISOString(), type:k, entries};
+    if(usedPull) rec.pullPhase=curPhase();
+    await workoutsCol.add(rec);
+    draft={_finished:true}; storeDraft(k);
     toast("Workout saved.");
   }catch(e){
-    toast(e&&e.code==="quota_exceeded"?"Storage is full: delete old workouts in History.":"Couldn't save. Check your connection and tap Finish again.");
+    toast("Couldn't save. Try again.");
   }finally{ saving=false; render(); }
 }
 
@@ -632,7 +729,7 @@ document.addEventListener("click",e=>{
   if(t.closest("[data-tstop]")){ stopTimer(); return; }
 });
 $("#backHome").addEventListener("click",()=>{
-  if(view.startsWith("d") && pageIdx>0) openLeaveConfirm(); else setView("home");
+  if(isW(view) && pageIdx>0) openLeaveConfirm(); else setView("home");
 });
 
 $("#view").addEventListener("input",e=>{
@@ -641,7 +738,7 @@ $("#view").addEventListener("input",e=>{
   const id=card.dataset.ex, i=+inp.dataset.i;
   if(!draft[id]) return;
   draft[id][i][inp.dataset.k]=inp.value;
-  storeDraft(+view.slice(1));
+  storeDraft(view);
 });
 
 $("#view").addEventListener("click",async e=>{
@@ -649,9 +746,16 @@ $("#view").addEventListener("click",async e=>{
   const go=t.closest("[data-go]"); if(go){ setView(go.dataset.go); return; }
   const img=t.closest("[data-img]"); if(img){ openModal(img.dataset.img); return; }
   const add=t.closest("[data-addset]");
-  if(add){ draft[add.dataset.addset].push({w:"",r:""}); storeDraft(+view.slice(1)); render(); return; }
+  if(add){ draft[add.dataset.addset].push({w:"",r:""}); storeDraft(view); render(); return; }
+  const alt=t.closest("[data-alt]");
+  if(alt){
+    const slot=WORKOUTS[view].slots.find(sl=>sl.code===alt.dataset.alt); if(!slot) return;
+    const n=slot.alts.length; draft._sel=draft._sel||{};
+    draft._sel[slot.code]=(selIdx(slot.code)+(+alt.dataset.dir)+n)%n;
+    storeDraft(view); render(); return;
+  }
   const rm=t.closest("[data-rmset]");
-  if(rm){ draft[rm.dataset.rmset].pop(); storeDraft(+view.slice(1)); render(); return; }
+  if(rm){ draft[rm.dataset.rmset].pop(); storeDraft(view); render(); return; }
   if(t.id==="finish"){ finishWorkout(); return; }
   if(t.id==="exportBtn"){ exportBackup(); return; }
   if(t.id==="testNotif"){ buzz(); notifyRestOver("A2 (test)"); setTimeout(clearRestNotification,6000); return; }
@@ -710,13 +814,14 @@ $("#file").addEventListener("change",async e=>{
 /* ---------- Start ---------- */
 (function initView(){
   const h=(location.hash||"").slice(1);
-  view=["home","d1","d2","d3","history","settings"].includes(h)?h:"home";
+  view=["home","upper","lower","history","settings"].includes(h)?h:"home";
   try{
     history.replaceState({v:"home"},"","#home");
     if(view!=="home") history.pushState({v:view},"","#"+view);
   }catch(e){}
-  draft=loadDraft(+view.slice(1)||1);
-  pageIdx=view.startsWith("d")?loadPage(+view.slice(1)):0;
+  draft=isW(view)?loadDraft(view):{};
+  pageIdx=isW(view)?loadPage(view):0;
+  if(draft._finished){ draft={}; clearDraft(view); pageIdx=0; storePage(view); }
   loadTimer();
   render();
 })();

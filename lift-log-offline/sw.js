@@ -1,5 +1,5 @@
 // Lift Log offline cache. The app checks version.json itself and refreshes this cache when a new version is online.
-const CACHE = "liftlog-v4";
+const CACHE = "liftlog-v5";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
